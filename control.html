@@ -143,10 +143,27 @@
             margin-top: 0.2rem;
         }
         .status {
-            text-align: center;
-            color: #b48cf2;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #262439;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            margin-top: 1.5rem;
             font-size: 0.9rem;
-            margin-top: 1rem;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #888;
+            transition: background 0.3s;
+        }
+        .status-dot.connected {
+            background: #0f0;
+        }
+        .status-dot.disconnected {
+            background: #f00;
         }
     </style>
 </head>
@@ -156,7 +173,6 @@
 
         <input type="text" id="textInput" value="The quick brown fox jumps over the lazy dog" placeholder="your text">
 
-        <!-- Text color -->
         <div class="color-row">
             <div class="color-item">
                 <label>text color</label>
@@ -168,13 +184,11 @@
             </div>
         </div>
 
-        <!-- Outline toggle -->
         <div class="checkbox-row">
             <input type="checkbox" id="outlineToggle" checked>
             <label for="outlineToggle">enable outline</label>
         </div>
 
-        <!-- Font family -->
         <div class="select-group">
             <label>font family</label>
             <select id="fontSelect">
@@ -191,7 +205,6 @@
             </select>
         </div>
 
-        <!-- Radius -->
         <div class="slider-group">
             <div class="slider-label">
                 <span>⭕ radius</span>
@@ -200,7 +213,6 @@
             <input type="range" id="radiusSlider" min="100" max="350" value="250" step="1">
         </div>
 
-        <!-- Font size -->
         <div class="slider-group">
             <div class="slider-label">
                 <span>🔠 font size</span>
@@ -209,7 +221,6 @@
             <input type="range" id="fontSizeSlider" min="12" max="100" value="36" step="1">
         </div>
 
-        <!-- Speed -->
         <div class="slider-group">
             <div class="slider-label">
                 <span>⚡ speed</span>
@@ -221,7 +232,11 @@
             </div>
         </div>
 
-        <div class="status">✨ changes broadcast live to display page</div>
+        <!-- Connection status -->
+        <div class="status" id="connectionStatus">
+            <span class="status-dot disconnected" id="statusDot"></span>
+            <span id="statusText">Waiting for display page...</span>
+        </div>
     </div>
 
     <script>
@@ -240,10 +255,35 @@
             const fontSizeDisplay = document.getElementById('fontSizeDisplay');
             const speedDisplay = document.getElementById('speedDisplay');
 
-            // ----- BroadcastChannel to communicate with display page -----
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            // ----- BroadcastChannel -----
             const channel = new BroadcastChannel('text_ring_channel');
 
-            // ----- helper: send current settings -----
+            // Keep track of whether any display is connected
+            let displayConnected = false;
+
+            // When we receive a message from display (including "ready")
+            channel.onmessage = (event) => {
+                const data = event.data;
+                if (data.type === 'display-ready') {
+                    displayConnected = true;
+                    statusDot.className = 'status-dot connected';
+                    statusText.textContent = 'Connected to display';
+                }
+                // Also handle any other messages if needed
+            };
+
+            // If no display responds within 2 seconds, show disconnected
+            setTimeout(() => {
+                if (!displayConnected) {
+                    statusDot.className = 'status-dot disconnected';
+                    statusText.textContent = 'No display found (open index.html)';
+                }
+            }, 2000);
+
+            // ----- send current settings -----
             function sendSettings() {
                 const settings = {
                     text: textInput.value,
@@ -260,7 +300,6 @@
 
             // ----- update displays and send on any change -----
             function updateAndSend() {
-                // update numeric displays
                 radiusDisplay.textContent = radiusSlider.value;
                 fontSizeDisplay.textContent = fontSizeSlider.value;
                 speedDisplay.textContent = parseFloat(speedSlider.value).toFixed(1);
@@ -268,7 +307,7 @@
                 sendSettings();
             }
 
-            // ----- event listeners for all controls -----
+            // ----- event listeners -----
             textInput.addEventListener('input', updateAndSend);
             textColorPicker.addEventListener('input', updateAndSend);
             outlineColorPicker.addEventListener('input', updateAndSend);
@@ -278,11 +317,8 @@
             fontSizeSlider.addEventListener('input', updateAndSend);
             speedSlider.addEventListener('input', updateAndSend);
 
-            // ----- send initial settings on load -----
+            // ----- send initial settings -----
             updateAndSend();
-
-            // (optional) notify that control panel is ready
-            console.log('Control panel ready – broadcasting settings.');
         })();
     </script>
 </body>
