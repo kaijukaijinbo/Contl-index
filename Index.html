@@ -18,6 +18,7 @@
             font-family: 'Segoe UI', sans-serif;
             transition: background 0.2s;
         }
+        /* focus mode – green screen */
         body.focus-mode {
             background: #00ff00 !important;
         }
@@ -124,20 +125,20 @@
                 currentSpeed = settings.speed;
             }
 
-            // BroadcastChannel
             const channel = new BroadcastChannel('text_ring_channel');
             channel.onmessage = (event) => {
-                const newSettings = event.data;
-                // Ignore messages that are just type: 'display-ready' (from control)
-                if (newSettings.type === 'display-ready') return;
-                settings = { ...settings, ...newSettings };
+                const data = event.data;
+                if (data.type === 'ping') {
+                    channel.postMessage({ type: 'pong' });
+                    return;
+                }
+                if (data.type === 'display-ready') return;
+                settings = { ...settings, ...data };
                 applySettings();
             };
 
-            // Announce we're alive
             channel.postMessage({ type: 'display-ready' });
 
-            // Animation
             function animate(timestamp) {
                 if (lastTimestamp !== null) {
                     const delta = Math.min(100, timestamp - lastTimestamp);
@@ -150,7 +151,6 @@
             }
             requestAnimationFrame(animate);
 
-            // Focus mode
             function toggleFocus() {
                 document.body.classList.toggle('focus-mode');
             }
