@@ -47,6 +47,14 @@
             border-radius: 20px;
             pointer-events: none;
         }
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #0f0;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -61,7 +69,10 @@
             </text>
         </svg>
     </div>
-    <div class="hint">N: focus mode | control panel → control.html</div>
+    <div class="hint">
+        <span class="status-dot" id="statusDot"></span>
+        N: focus mode | control panel → control.html
+    </div>
 
     <script>
         (function() {
@@ -72,8 +83,9 @@
             const outlineText = document.getElementById('outlineText');
             const mainTextPath = document.querySelector('#mainText textPath');
             const outlineTextPath = document.querySelector('#outlineText textPath');
+            const statusDot = document.getElementById('statusDot');
 
-            // ----- default settings (used before any message) -----
+            // ----- default settings -----
             let settings = {
                 text: 'The quick brown fox jumps over the lazy dog',
                 textColor: '#ffffff',
@@ -82,7 +94,7 @@
                 fontFamily: "'Courier New', monospace",
                 radius: 250,
                 fontSize: 36,
-                speed: -9.0      // default fast reverse
+                speed: -9.0
             };
 
             // ----- animation state -----
@@ -92,12 +104,10 @@
 
             // ----- apply settings to SVG -----
             function applySettings() {
-                // text content
                 const displayText = settings.text || ' ';
                 mainTextPath.textContent = displayText;
                 outlineTextPath.textContent = displayText;
 
-                // colors
                 mainText.setAttribute('fill', settings.textColor);
                 if (settings.outlineEnabled) {
                     outlineText.setAttribute('stroke', settings.outlineColor);
@@ -105,38 +115,40 @@
                     outlineText.setAttribute('stroke', 'none');
                 }
 
-                // font
                 mainText.setAttribute('font-family', settings.fontFamily);
                 outlineText.setAttribute('font-family', settings.fontFamily);
 
-                // font size
                 mainText.setAttribute('font-size', settings.fontSize);
                 outlineText.setAttribute('font-size', settings.fontSize);
 
-                // radius (update circle path)
                 const r = settings.radius;
                 const cx = 400, cy = 400;
                 const d = `M ${cx},${cy} m -${r},0 a ${r},${r} 0 1,1 ${2*r},0 a ${r},${r} 0 1,1 -${2*r},0`;
                 circlePath.setAttribute('d', d);
 
-                // speed
                 currentSpeed = settings.speed;
             }
 
-            // ----- receive settings from control page via BroadcastChannel -----
+            // ----- BroadcastChannel communication -----
             const channel = new BroadcastChannel('text_ring_channel');
+
+            // When we receive settings from control page
             channel.onmessage = (event) => {
                 const newSettings = event.data;
-                // update settings object (preserve defaults for missing fields)
                 settings = { ...settings, ...newSettings };
                 applySettings();
+                // Flash the status dot to indicate update
+                statusDot.style.background = '#ff0';
+                setTimeout(() => { statusDot.style.background = '#0f0'; }, 200);
             };
+
+            // Announce that this display page is ready
+            channel.postMessage({ type: 'display-ready' });
 
             // ----- animation loop -----
             function animate(timestamp) {
                 if (lastTimestamp !== null) {
-                    const delta = Math.min(100, timestamp - lastTimestamp); // safety cap
-                    // rotation factor: 0.036 deg/ms gives ~10s per full rotation at speed=1
+                    const delta = Math.min(100, timestamp - lastTimestamp);
                     const rotationDelta = currentSpeed * delta * 0.036;
                     angle += rotationDelta;
                     svg.style.transform = `rotate(${angle}deg)`;
@@ -162,7 +174,7 @@
                 }
             });
 
-            // ----- initial apply (with defaults) -----
+            // ----- initial apply -----
             applySettings();
         })();
     </script>
