@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>spinning text · display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2b;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', sans-serif;
+            transition: background 0.2s;
+        }
+        /* focus mode – green screen */
+        body.focus-mode {
+            background: #00ff00 !important;
+        }
+        body.focus-mode .hint {
+            display: none;
+        }
+        .ring-container {
+            width: 90vmin;
+            height: 90vmin;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            transform-origin: center center;
+            will-change: transform;
+        }
+        .hint {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            color: #888;
+            font-size: 12px;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 8px;
+            border-radius: 20px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="ring-container">
+        <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid meet" id="spinningSvg">
+            <path id="circlePath" d="M 400,400 m -250,0 a 250,250 0 1,1 500,0 a 250,250 0 1,1 -500,0" fill="none" stroke="none" />
+            <text id="outlineText" fill="none" stroke="#aa7eec" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" font-family="'Courier New', monospace" font-size="36" font-weight="bold" text-anchor="middle">
+                <textPath href="#circlePath" startOffset="50%"></textPath>
+            </text>
+            <text id="mainText" fill="#ffffff" font-family="'Courier New', monospace" font-size="36" font-weight="bold" text-anchor="middle">
+                <textPath href="#circlePath" startOffset="50%"></textPath>
+            </text>
+        </svg>
+    </div>
+    <div class="hint">N: focus mode | control panel → control.html</div>
+
+    <script>
+        (function() {
+            // ----- DOM elements -----
+            const svg = document.getElementById('spinningSvg');
+            const circlePath = document.getElementById('circlePath');
+            const mainText = document.getElementById('mainText');
+            const outlineText = document.getElementById('outlineText');
+            const mainTextPath = document.querySelector('#mainText textPath');
+            const outlineTextPath = document.querySelector('#outlineText textPath');
+
+            // ----- default settings (used before any message) -----
+            let settings = {
+                text: 'The quick brown fox jumps over the lazy dog',
+                textColor: '#ffffff',
+                outlineColor: '#aa7eec',
+                outlineEnabled: true,
+                fontFamily: "'Courier New', monospace",
+                radius: 250,
+                fontSize: 36,
+                speed: -9.0      // default fast reverse
+            };
+
+            // ----- animation state -----
+            let angle = 0;
+            let lastTimestamp = null;
+            let currentSpeed = settings.speed;
+
+            // ----- apply settings to SVG -----
+            function applySettings() {
+                // text content
+                const displayText = settings.text || ' ';
+                mainTextPath.textContent = displayText;
+                outlineTextPath.textContent = displayText;
+
+                // colors
+                mainText.setAttribute('fill', settings.textColor);
+                if (settings.outlineEnabled) {
+                    outlineText.setAttribute('stroke', settings.outlineColor);
+                } else {
+                    outlineText.setAttribute('stroke', 'none');
+                }
+
+                // font
+                mainText.setAttribute('font-family', settings.fontFamily);
+                outlineText.setAttribute('font-family', settings.fontFamily);
+
+                // font size
+                mainText.setAttribute('font-size', settings.fontSize);
+                outlineText.setAttribute('font-size', settings.fontSize);
+
+                // radius (update circle path)
+                const r = settings.radius;
+                const cx = 400, cy = 400;
+                const d = `M ${cx},${cy} m -${r},0 a ${r},${r} 0 1,1 ${2*r},0 a ${r},${r} 0 1,1 -${2*r},0`;
+                circlePath.setAttribute('d', d);
+
+                // speed
+                currentSpeed = settings.speed;
+            }
+
+            // ----- receive settings from control page via BroadcastChannel -----
+            const channel = new BroadcastChannel('text_ring_channel');
+            channel.onmessage = (event) => {
+                const newSettings = event.data;
+                // update settings object (preserve defaults for missing fields)
+                settings = { ...settings, ...newSettings };
+                applySettings();
+            };
+
+            // ----- animation loop -----
+            function animate(timestamp) {
+                if (lastTimestamp !== null) {
+                    const delta = Math.min(100, timestamp - lastTimestamp); // safety cap
+                    // rotation factor: 0.036 deg/ms gives ~10s per full rotation at speed=1
+                    const rotationDelta = currentSpeed * delta * 0.036;
+                    angle += rotationDelta;
+                    svg.style.transform = `rotate(${angle}deg)`;
+                }
+                lastTimestamp = timestamp;
+                requestAnimationFrame(animate);
+            }
+            requestAnimationFrame(animate);
+
+            // ----- focus mode (green screen) with N key -----
+            function toggleFocus() {
+                document.body.classList.toggle('focus-mode');
+            }
+            function exitFocus() {
+                document.body.classList.remove('focus-mode');
+            }
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'n' || e.key === 'N') {
+                    e.preventDefault();
+                    toggleFocus();
+                } else if (e.key === 'Escape') {
+                    exitFocus();
+                }
+            });
+
+            // ----- initial apply (with defaults) -----
+            applySettings();
+        })();
+    </script>
+</body>
+</html>
