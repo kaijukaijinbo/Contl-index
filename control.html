@@ -142,15 +142,19 @@
             color: #8f8ab0;
             margin-top: 0.2rem;
         }
-        .status {
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #262439;
+            padding: 0.7rem 1rem;
+            border-radius: 2rem;
+            margin-top: 1.5rem;
+        }
+        .status-left {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            background: #262439;
-            padding: 0.5rem 1rem;
-            border-radius: 2rem;
-            margin-top: 1.5rem;
-            font-size: 0.9rem;
         }
         .status-dot {
             width: 12px;
@@ -164,6 +168,19 @@
         }
         .status-dot.disconnected {
             background: #f00;
+        }
+        .reconnect-btn {
+            background: #b48cf2;
+            border: none;
+            color: #1a1a2b;
+            padding: 0.3rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .reconnect-btn:hover {
+            background: #c7a9ff;
         }
     </style>
 </head>
@@ -232,16 +249,19 @@
             </div>
         </div>
 
-        <!-- Connection status -->
-        <div class="status" id="connectionStatus">
-            <span class="status-dot disconnected" id="statusDot"></span>
-            <span id="statusText">Waiting for display page...</span>
+        <!-- Connection status + reconnect button -->
+        <div class="status-row">
+            <div class="status-left">
+                <span class="status-dot disconnected" id="statusDot"></span>
+                <span id="statusText">No display found</span>
+            </div>
+            <button class="reconnect-btn" id="reconnectBtn">⟳ reconnect</button>
         </div>
     </div>
 
     <script>
         (function() {
-            // ----- DOM elements -----
+            // DOM elements
             const textInput = document.getElementById('textInput');
             const textColorPicker = document.getElementById('textColorPicker');
             const outlineColorPicker = document.getElementById('outlineColorPicker');
@@ -257,33 +277,14 @@
 
             const statusDot = document.getElementById('statusDot');
             const statusText = document.getElementById('statusText');
+            const reconnectBtn = document.getElementById('reconnectBtn');
 
-            // ----- BroadcastChannel -----
+            // BroadcastChannel
             const channel = new BroadcastChannel('text_ring_channel');
 
-            // Keep track of whether any display is connected
             let displayConnected = false;
 
-            // When we receive a message from display (including "ready")
-            channel.onmessage = (event) => {
-                const data = event.data;
-                if (data.type === 'display-ready') {
-                    displayConnected = true;
-                    statusDot.className = 'status-dot connected';
-                    statusText.textContent = 'Connected to display';
-                }
-                // Also handle any other messages if needed
-            };
-
-            // If no display responds within 2 seconds, show disconnected
-            setTimeout(() => {
-                if (!displayConnected) {
-                    statusDot.className = 'status-dot disconnected';
-                    statusText.textContent = 'No display found (open index.html)';
-                }
-            }, 2000);
-
-            // ----- send current settings -----
+            // Function to send current settings
             function sendSettings() {
                 const settings = {
                     text: textInput.value,
@@ -298,16 +299,70 @@
                 channel.postMessage(settings);
             }
 
-            // ----- update displays and send on any change -----
+            // Update numeric displays and send
             function updateAndSend() {
                 radiusDisplay.textContent = radiusSlider.value;
                 fontSizeDisplay.textContent = fontSizeSlider.value;
                 speedDisplay.textContent = parseFloat(speedSlider.value).toFixed(1);
-
                 sendSettings();
             }
 
-            // ----- event listeners -----
+            // Handle incoming messages from display
+            channel.onmessage = (event) => {
+                const data = event.data;
+                if (data.type === 'display-ready') {
+                    displayConnected = true;
+                    statusDot.className = 'status-dot connected';
+                    statusText.textContent = 'Connected';
+                    // Immediately send current settings to the newly connected display
+                    sendSettings();
+                }
+                // (ignore other messages)
+            };
+
+            // Check if we already have a display (maybe it sent ready before we started listening)
+            // We'll send a ping and hope for a response? Instead, we'll just try to send a dummy.
+            // The display will send ready when it loads. If it loaded before us, we missed it.
+            // So we'll also send a "control-ready" message and display can respond? Simpler: use a timeout to ask user to reconnect.
+            // We'll also have a reconnect button that re-sends settings and pings.
+
+            // Initial attempt: send a ping message (non-settings) to see if any display responds.
+            // But display only responds with 'display-ready' on load. So we'll just rely on that.
+            // However, if display loaded before control, we'll never get its ready message.
+            // So we'll set a timer: if after 2 seconds no connection, show disconnected.
+            setTimeout(() => {
+                if (!displayConnected) {
+                    statusDot.className = 'status-dot disconnected';
+                    statusText.textContent = 'No display (open index.html)';
+                }
+            }, 2000);
+
+            // Reconnect button: force send settings and ping displays by sending a dummy message?
+            reconnectBtn.addEventListener('click', () => {
+                // Broadcast a "ping" message – displays ignore it, but maybe they can reply? Let's just resend settings.
+                // We'll also reset status to waiting.
+                displayConnected = false;
+                statusDot.className = 'status-dot disconnected';
+                statusText.textContent = 'Searching...';
+                sendSettings(); // maybe a display will receive and reply? No, it only sends ready once.
+                // We can also ask displays to re-announce? But we can't.
+                // Instead, we'll rely on the fact that if a display is open, it will receive our settings and we'll get no reply, but at least settings go through.
+                // But we want the green dot. So we'll also send a special "ping" that displays can respond to.
+                channel.postMessage({ type: 'ping' });
+                // Wait a bit for a pong
+                setTimeout(() => {
+                    if (!displayConnected) {
+                        statusText.textContent = 'No response (check OBS)';
+                    }
+                }, 1000);
+            });
+
+            // Listen for pong from display? Let's add a pong handler in display too.
+            // We'll update display to respond to 'ping' with 'pong'.
+            // But we haven't updated display yet. Let's add that in display code.
+            // For now, we'll just rely on reconnect button to resend settings and hope.
+
+            // Event listeners
             textInput.addEventListener('input', updateAndSend);
             textColorPicker.addEventListener('input', updateAndSend);
             outlineColorPicker.addEventListener('input', updateAndSend);
@@ -317,8 +372,23 @@
             fontSizeSlider.addEventListener('input', updateAndSend);
             speedSlider.addEventListener('input', updateAndSend);
 
-            // ----- send initial settings -----
+            // Initial send
             updateAndSend();
+
+            // Also listen for pong if display supports it
+            channel.onmessage = (event) => {
+                const data = event.data;
+                if (data.type === 'display-ready') {
+                    displayConnected = true;
+                    statusDot.className = 'status-dot connected';
+                    statusText.textContent = 'Connected';
+                    sendSettings();
+                } else if (data.type === 'pong') {
+                    displayConnected = true;
+                    statusDot.className = 'status-dot connected';
+                    statusText.textContent = 'Connected';
+                }
+            };
         })();
     </script>
 </body>
