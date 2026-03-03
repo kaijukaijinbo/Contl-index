@@ -26,14 +26,36 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.6);
             width: 600px;
             max-width: 100%;
+            max-height: 90vh;          /* allows scrolling when content exceeds */
+            overflow-y: auto;           /* enable vertical scroll */
             color: #dddaf0;
+            scrollbar-width: thin;
+            scrollbar-color: #b48cf2 #262439;
         }
+        .panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        .panel::-webkit-scrollbar-track {
+            background: #262439;
+            border-radius: 4px;
+        }
+        .panel::-webkit-scrollbar-thumb {
+            background: #b48cf2;
+            border-radius: 4px;
+        }
+
         h2 {
             font-weight: 350;
             margin-bottom: 1.5rem;
             border-bottom: 1px dashed #5f5c8a;
             padding-bottom: 0.5rem;
+            position: sticky;
+            top: 0;
+            background: rgba(30, 30, 46, 0.9); /* keep title visible when scrolling */
+            backdrop-filter: blur(8px);
+            z-index: 10;
         }
+
         input[type="text"] {
             width: 100%;
             background: #262439;
@@ -174,6 +196,9 @@
             padding: 0.7rem 1rem;
             border-radius: 2rem;
             margin-top: 1.5rem;
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
         }
         .status-left {
             display: flex;
@@ -325,7 +350,7 @@
 
             let displayConnected = false;
 
-            // Sync functions (similar to combined page)
+            // Sync functions
             function syncTextColorFromPicker() {
                 const col = textColorPicker.value;
                 textColorHex.value = col;
