@@ -18,7 +18,6 @@
             font-family: 'Segoe UI', sans-serif;
             transition: background 0.2s;
         }
-        /* focus mode – green screen */
         body.focus-mode {
             background: #00ff00 !important;
         }
@@ -46,14 +45,15 @@
             padding: 4px 8px;
             border-radius: 20px;
             pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         .status-dot {
-            display: inline-block;
             width: 10px;
             height: 10px;
             background: #0f0;
             border-radius: 50%;
-            margin-right: 5px;
         }
     </style>
 </head>
@@ -70,22 +70,19 @@
         </svg>
     </div>
     <div class="hint">
-        <span class="status-dot" id="statusDot"></span>
-        N: focus mode | control panel → control.html
+        <span class="status-dot"></span>
+        N: focus | control.html
     </div>
 
     <script>
         (function() {
-            // ----- DOM elements -----
             const svg = document.getElementById('spinningSvg');
             const circlePath = document.getElementById('circlePath');
             const mainText = document.getElementById('mainText');
             const outlineText = document.getElementById('outlineText');
             const mainTextPath = document.querySelector('#mainText textPath');
             const outlineTextPath = document.querySelector('#outlineText textPath');
-            const statusDot = document.getElementById('statusDot');
 
-            // ----- default settings -----
             let settings = {
                 text: 'The quick brown fox jumps over the lazy dog',
                 textColor: '#ffffff',
@@ -97,12 +94,10 @@
                 speed: -9.0
             };
 
-            // ----- animation state -----
             let angle = 0;
             let lastTimestamp = null;
             let currentSpeed = settings.speed;
 
-            // ----- apply settings to SVG -----
             function applySettings() {
                 const displayText = settings.text || ' ';
                 mainTextPath.textContent = displayText;
@@ -129,23 +124,20 @@
                 currentSpeed = settings.speed;
             }
 
-            // ----- BroadcastChannel communication -----
+            // BroadcastChannel
             const channel = new BroadcastChannel('text_ring_channel');
-
-            // When we receive settings from control page
             channel.onmessage = (event) => {
                 const newSettings = event.data;
+                // Ignore messages that are just type: 'display-ready' (from control)
+                if (newSettings.type === 'display-ready') return;
                 settings = { ...settings, ...newSettings };
                 applySettings();
-                // Flash the status dot to indicate update
-                statusDot.style.background = '#ff0';
-                setTimeout(() => { statusDot.style.background = '#0f0'; }, 200);
             };
 
-            // Announce that this display page is ready
+            // Announce we're alive
             channel.postMessage({ type: 'display-ready' });
 
-            // ----- animation loop -----
+            // Animation
             function animate(timestamp) {
                 if (lastTimestamp !== null) {
                     const delta = Math.min(100, timestamp - lastTimestamp);
@@ -158,7 +150,7 @@
             }
             requestAnimationFrame(animate);
 
-            // ----- focus mode (green screen) with N key -----
+            // Focus mode
             function toggleFocus() {
                 document.body.classList.toggle('focus-mode');
             }
@@ -174,7 +166,6 @@
                 }
             });
 
-            // ----- initial apply -----
             applySettings();
         })();
     </script>
